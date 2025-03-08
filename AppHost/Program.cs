@@ -2,6 +2,10 @@ using Projects;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-builder.AddProject<Petunio>("petunio");
+// Ollama + Janus
+var ollama = builder.AddOllama("ollama").WithOpenWebUI();
+var petunio = ollama.AddModel("huihui_ai/phi4-abliterated");
+
+builder.AddProject<Petunio>("petunio").WithReference(petunio).WaitFor(petunio);
 
 builder.Build().Run();
