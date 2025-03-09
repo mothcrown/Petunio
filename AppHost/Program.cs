@@ -2,10 +2,11 @@ using Projects;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Ollama + Janus
-var ollama = builder.AddOllama("ollama").WithOpenWebUI();
-var petunio = ollama.AddModel("huihui_ai/phi4-abliterated");
+// Ollama
+builder
+    .AddDockerfile("ollama", "Ollama", "Ollama.Dockerfile")
+    .WithHttpEndpoint(env: "OLLAMA_HTTP_ENDPOINT", port: 11434, targetPort: 11434);
 
-builder.AddProject<Petunio>("petunio").WithReference(petunio).WaitFor(petunio);
+builder.AddProject<Petunio>("petunio");
 
 builder.Build().Run();
