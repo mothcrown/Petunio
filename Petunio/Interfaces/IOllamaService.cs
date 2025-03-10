@@ -2,7 +2,7 @@ using System.Xml;
 
 namespace Petunio.Interfaces;
 
-public interface IPetunioService
+public interface IOllamaService
 {
     public Task<XmlDocument> Message(string prompt);
 }

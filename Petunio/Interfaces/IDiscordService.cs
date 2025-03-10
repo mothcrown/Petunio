@@ -1,10 +1,12 @@
+using Discord.WebSocket;
+
 namespace Petunio.Interfaces;
 
 public interface IDiscordService
 {
-    public Task StartAsync(ServiceProvider services);
+    public Task StartAsync();
     
     public Task StopAsync();
-    
-    public Task SendMessage(string message);
+
+    public Task MessageReceivedAsync(SocketMessage socketMessage);
 }

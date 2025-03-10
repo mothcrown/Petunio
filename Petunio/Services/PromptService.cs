@@ -9,7 +9,7 @@ public class PromptService : IPromptService
     private ILogger<PromptService> _logger;
     private IDateTime _dateTime;
     private IConfiguration _configuration;
-    private IPetunioService _petunioService;
+    private IOllamaService _ollamaService;
     private IDiscordService _discordService;
     
     private XmlDocument _previousResponse = new XmlDocument();
@@ -20,12 +20,12 @@ public class PromptService : IPromptService
     private bool _ownerSentMessage;
     
     public PromptService(ILogger<PromptService> logger, IDateTime dateTime, IConfiguration configuration,
-        IPetunioService petunioService, IDiscordService discordService)
+        IOllamaService ollamaService, IDiscordService discordService)
     {
         _logger = logger;
         _dateTime = dateTime;
         _configuration = configuration;
-        _petunioService = petunioService;
+        _ollamaService = ollamaService;
         _discordService = discordService;
         
         _ownerName = _configuration.GetValue<string>("OwnerName")!;
@@ -35,7 +35,7 @@ public class PromptService : IPromptService
         _ownerSentMessage = false;
     }
 
-    public async Task ProcessDiscordInputAsync(string input)
+    public async Task<string> ProcessDiscordInputAsync(string input)
     {
         _logger.LogInformation("Discord message received");
         
@@ -48,7 +48,9 @@ public class PromptService : IPromptService
         
         prompt += LoadActionsString();
 
-        var response = await _petunioService.Message(prompt);
+        // var response = await _ollamaService.Message(prompt);
+
+        return "OK";
     }
 
     public Task ProcessQuartzInputAsync(string input)
@@ -87,10 +89,12 @@ public class PromptService : IPromptService
         var thinkMessage = "Puedes pensar sobre algo que quieras o se te haya pedido. Si piensas NO puedes realizar otras acciones en este turno, pero en los siguientes turnos puedes ver qué has pensado previamente.";
         if (HasReachedThinkingTurnsLimit())
         {
-            thinkMessage = "Has llegado al límite de usos de esta acción. No puedes usarla en este turno.";
+            thinkMessage = "Has llegado al límite de usos encadenados de esta acción. No puedes usarla en este turno.";
         }
         
         actions.Add("think", thinkMessage);
+        
+        actions.Add("noAction", "Elige no realizar ninguna acción, ej. </noAction>");
 
         return actions;
     }
