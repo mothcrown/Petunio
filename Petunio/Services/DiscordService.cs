@@ -16,13 +16,10 @@ public class DiscordService : IDiscordService
     {
         _logger = logger;
         _configuration = configuration;
+        _promptService = promptService;
         _discordUserId = _configuration.GetValue<ulong>("Discord:UserId");
-        
-        DiscordSocketConfig config = new()
-        {
-            GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent
-        };
-        
+
+        DiscordSocketConfig config = new();
         _client = new DiscordSocketClient(config);
     }
 
@@ -45,11 +42,15 @@ public class DiscordService : IDiscordService
 
     public async Task MessageReceivedAsync(SocketMessage message)
     {
+        _logger.LogInformation("Discord message received");
         if (!IsValidMessage(message)) return;
 
         using (message.Channel.EnterTypingState());
         var response = await _promptService.ProcessDiscordInputAsync(message.Content);
-        await message.Channel.SendMessageAsync(response);
+        if (!string.IsNullOrEmpty(response))
+        {
+            await message.Channel.SendMessageAsync(response);
+        }
     }
 
     private bool IsValidMessage(SocketMessage message)

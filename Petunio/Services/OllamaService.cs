@@ -14,8 +14,11 @@ public class OllamaService(ILogger<OllamaService> logger, IConfiguration configu
         
         var xmlResponse = new XmlDocument();
         logger.LogInformation("Petunio is generating a response...");
-        var response = await ollama.GenerateAsync(prompt)
-            .AggregateAsync("", (current, stream) => current + stream!.Response);
+        var response = "";
+        await foreach (var stream in ollama.GenerateAsync(prompt))
+        {
+            response += stream!.Response;
+        }
         
         logger.LogInformation(response);
         

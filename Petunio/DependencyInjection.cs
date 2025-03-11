@@ -11,7 +11,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IDateTime, DateTime>();
         builder.Services.AddSingleton<IDiscordService, DiscordService>();
         builder.Services.AddSingleton<IOllamaService, OllamaService>();
-        builder.Services.AddSingleton<IPromptService, IPromptService>();
+        builder.Services.AddSingleton<IPromptService, PromptService>();
         builder.Services.AddHostedService<DiscordStartupService>();
     }
 }
