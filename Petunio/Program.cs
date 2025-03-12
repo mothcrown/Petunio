@@ -1,10 +1,19 @@
 using Petunio;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenApi();
+// Serilog
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .WriteTo.Console()
+    .WriteTo.File("logs/petunio.log", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
 
+builder.Services.AddOpenApi();
 builder.AddServices();
+
+builder.Host.UseSerilog();
 
 var app = builder.Build();
 

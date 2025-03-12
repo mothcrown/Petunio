@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Xml;
 using OllamaSharp;
 using Petunio.Interfaces;
@@ -20,9 +21,37 @@ public class OllamaService(ILogger<OllamaService> logger, IConfiguration configu
             response += stream!.Response;
         }
         
-        logger.LogInformation(response);
+        response = SanitizeResponse(response);
+        logger.LogDebug(response);
         
         xmlResponse.LoadXml(response);
         return xmlResponse;
+    }
+
+    private string SanitizeResponse(string response)
+    {
+        var reply = response;
+        
+        // ```xml ... ```
+        if (response.StartsWith("```"))
+        {
+            reply = response.Remove(response.Length - 3).Remove(0, 6);
+        }
+
+        // TODO Add a way to replace <!-- xml comments -->
+        reply = SanitizeNodeInnerText(reply, "message");
+        reply = SanitizeNodeInnerText(reply, "think");
+        
+        return reply;
+    }
+
+    private string SanitizeNodeInnerText(string reply, string nodeName)
+    {
+        return Regex.Replace(reply, $@"<{nodeName}>(.*?)<\/think>", match =>
+        {
+            string innerText = match.Groups[1].Value;
+            string sanitizedText = innerText.Replace("<", "&lt;").Replace(">", "&gt;");
+            return $"<{nodeName}>{sanitizedText}</{nodeName}>";
+        }, RegexOptions.Singleline);
     }
 }

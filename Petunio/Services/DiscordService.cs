@@ -6,11 +6,11 @@ namespace Petunio.Services;
 
 public class DiscordService : IDiscordService
 {
-    private ILogger<DiscordService> _logger;
-    private IConfiguration _configuration;
-    private IPromptService _promptService;
-    private DiscordSocketClient _client;
-    private ulong _discordUserId;
+    private readonly ILogger<DiscordService> _logger;
+    private readonly IConfiguration _configuration;
+    private readonly IPromptService _promptService;
+    private readonly DiscordSocketClient _client;
+    private readonly ulong _discordUserId;
     
     public DiscordService(ILogger<DiscordService> logger, IConfiguration configuration, IPromptService promptService)
     {
@@ -49,6 +49,7 @@ public class DiscordService : IDiscordService
         var response = await _promptService.ProcessDiscordInputAsync(message.Content);
         if (!string.IsNullOrEmpty(response))
         {
+            _logger.LogInformation("Response sent over Discord");
             await message.Channel.SendMessageAsync(response);
         }
     }

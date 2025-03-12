@@ -7,10 +7,10 @@ namespace Petunio.Services;
 
 public class PromptService : IPromptService
 {
-    private ILogger<PromptService> _logger;
-    private IDateTime _dateTime;
-    private IConfiguration _configuration;
-    private IOllamaService _ollamaService;
+    private readonly ILogger<PromptService> _logger;
+    private readonly IDateTime _dateTime;
+    private readonly IConfiguration _configuration;
+    private readonly IOllamaService _ollamaService;
     
     private List<XmlNode> _thinkingNodes = [];
     private readonly CultureInfo _cultureInfo;
@@ -83,7 +83,7 @@ public class PromptService : IPromptService
     private async Task<string?> ProcessAsync()
     {
         var prompt = BuildPrompt();
-        _logger.LogInformation(prompt);
+        _logger.LogDebug(prompt);
         XmlDocument response;
         try
         {
