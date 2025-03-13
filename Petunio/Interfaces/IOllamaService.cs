@@ -4,5 +4,5 @@ namespace Petunio.Interfaces;
 
 public interface IOllamaService
 {
-    public Task<XmlDocument> Message(string prompt);
+    public Task<string> Message(string prompt);
 }
