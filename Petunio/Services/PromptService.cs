@@ -11,6 +11,7 @@ public class PromptService : IPromptService
     private readonly IDateTime _dateTime;
     private readonly IConfiguration _configuration;
     private readonly IOllamaService _ollamaService;
+    private readonly IMemoryService _memoryService;
     
     private readonly CultureInfo _cultureInfo;
     private readonly string _ownerName;
@@ -18,12 +19,13 @@ public class PromptService : IPromptService
     private string? _lastOwnerMessage;
     
     public PromptService(ILogger<PromptService> logger, IDateTime dateTime, IConfiguration configuration,
-        IOllamaService ollamaService)
+        IOllamaService ollamaService, IMemoryService memoryService)
     {
         _logger = logger;
         _dateTime = dateTime;
         _configuration = configuration;
         _ollamaService = ollamaService;
+        _memoryService = memoryService;
         
         _ownerName = _configuration.GetValue<string>("OwnerName")!;
         _cultureInfo = new CultureInfo("es-ES");
@@ -73,6 +75,17 @@ public class PromptService : IPromptService
         {
             // We only get the first one and ignore the rest, sorry Petunio
             reply = response.GetElementsByTagName("message")[0]!.InnerText;
+            _ownerSentMessage = false;
+        }
+        
+        var memoryNodes = response.GetElementsByTagName("memory");
+        if (memoryNodes.Count > 0)
+        {
+            foreach (XmlNode memoryNode in memoryNodes)
+            {
+                await _memoryService.SaveMemoryAsync(memoryNode.InnerText);    
+            }
+            
             _ownerSentMessage = false;
         }
         
@@ -131,6 +144,8 @@ public class PromptService : IPromptService
         }
         
         actions.Add("think", $"Puedes pensar sobre algo que quieras o se te haya pedido. {_ownerName} no va a leer esto.");
+        
+        actions.Add("memory", "Puedes guardar algo en tu memoria para recordarlo después. Importante: tu memoria no debe pasar de 150 caracteres.");
 
         return actions;
     }
