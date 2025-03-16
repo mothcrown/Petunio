@@ -7,4 +7,6 @@ Asistente IA experimental!
 Para ejecutar la aplicación
 
 ```bash
+cd AppHost
 dotnet watch run
+```

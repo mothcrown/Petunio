@@ -46,11 +46,14 @@ public class DiscordService : IDiscordService
         if (!IsValidMessage(message)) return;
 
         using (message.Channel.EnterTypingState());
-        var response = await _promptService.ProcessDiscordInputAsync(message.Content);
-        if (!string.IsNullOrEmpty(response))
+        var responses = await _promptService.ProcessDiscordInputAsync(message.Content);
+
+        foreach (var response in responses)
         {
-            _logger.LogInformation("Response sent over Discord");
-            await message.Channel.SendMessageAsync(response);
+            if (!string.IsNullOrEmpty(response))
+            {
+                await message.Channel.SendMessageAsync(response);
+            }
         }
     }
 

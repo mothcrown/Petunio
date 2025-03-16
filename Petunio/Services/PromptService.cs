@@ -32,7 +32,7 @@ public class PromptService : IPromptService
         _ownerSentMessage = false;
     }
 
-    public async Task<string?> ProcessDiscordInputAsync(string input)
+    public async Task<List<string?>> ProcessDiscordInputAsync(string input)
     {
         _ownerSentMessage = true;
         _lastOwnerMessage = input;
@@ -40,12 +40,39 @@ public class PromptService : IPromptService
         return await ProcessAsync();
     }
 
-    private string BuildPrompt()
+    private async Task<string> BuildPrompt()
     {
         var prompt = GetDateString() + Environment.NewLine;
-        prompt += GetDiscordMessage() + Environment.NewLine;
+        if (_ownerSentMessage)
+        {
+            prompt += GetDiscordMessage() + Environment.NewLine;
+        }
+
+        prompt += await GetMemoryString();
         prompt += LoadActionsString();
         return prompt;
+    }
+
+    private async Task<string> GetMemoryString()
+    {
+        string memoryString = "";
+        string query = GetMemoryQueryString();
+        var memoryList = await _memoryService.GetMemoriesAsync(query);
+        if (memoryList.Any())
+        {
+            memoryString += "Tienes memorias relacionadas:" + Environment.NewLine;
+            foreach (var memory in memoryList)
+            {
+                memoryString += $"* {memory}" + Environment.NewLine;
+            }
+        }
+
+        return memoryString;
+    }
+
+    private string GetMemoryQueryString()
+    {
+        return $"{GetDateString()} Mensaje de {_ownerName}: {_lastOwnerMessage}";
     }
 
     private string GetDiscordMessage()
@@ -61,20 +88,24 @@ public class PromptService : IPromptService
         throw new NotImplementedException();
     }
 
-    private async Task<string?> ProcessAsync()
+    private async Task<List<string?>> ProcessAsync()
     {
-        var prompt = BuildPrompt();
+        var prompt = await BuildPrompt();
         _logger.LogDebug(prompt);
 
         XmlDocument response = await GetPetunioResponse(prompt);
         
-        string? reply = null;
+        var replies = new List<string?>();
         
         // First we resolve messages
-        if (response.GetElementsByTagName("message").Count > 0)
+        var messageNodes = response.GetElementsByTagName("message");
+        if (messageNodes.Count > 0)
         {
-            // We only get the first one and ignore the rest, sorry Petunio
-            reply = response.GetElementsByTagName("message")[0]!.InnerText;
+            foreach (XmlNode messageNode in messageNodes)
+            {
+                replies.Add(messageNode.InnerText);
+            }
+            
             _ownerSentMessage = false;
         }
         
@@ -85,11 +116,9 @@ public class PromptService : IPromptService
             {
                 await _memoryService.SaveMemoryAsync(memoryNode.InnerText);    
             }
-            
-            _ownerSentMessage = false;
         }
         
-        return reply;
+        return replies;
     }
 
     private async Task<XmlDocument> GetPetunioResponse(string prompt)
@@ -98,7 +127,7 @@ public class PromptService : IPromptService
         try
         {
             var strResponse = await _ollamaService.Message(prompt);
-            response = LoadXmlDocument(response, strResponse);
+            response = LoadXmlDocument(response, $"<response>{strResponse}</response>");
         }
         catch (Exception ex)
         {
@@ -138,14 +167,17 @@ public class PromptService : IPromptService
     {
         Dictionary<string, string> actions = new Dictionary<string, string>();
         
+        // <message>
         if (IsOwnerAvailable())
         {
-            actions.Add("message", $"Mandar un mensaje a {_ownerName} o responder a un mensaje suyo.");
+            actions.Add("message", $"Mandar un mensaje a {_ownerName} o responder a un mensaje suyo. {_ownerName} no va a leer nada que no esté dentro de <message>. Ej. <message>Hola!</message>");
         }
         
-        actions.Add("think", $"Puedes pensar sobre algo que quieras o se te haya pedido. {_ownerName} no va a leer esto.");
+        // <think>
+        actions.Add("think", $"Puedes pensar sobre algo que quieras o se te haya pedido. {_ownerName} no va a leer esto. Ej. <think>Uhmmm...</think>");
         
-        actions.Add("memory", "Puedes guardar algo en tu memoria para recordarlo después. Importante: tu memoria no debe pasar de 150 caracteres.");
+        // <memory>
+        actions.Add("memory", $"Puedes guardar algo en tu memoria para recordarlo después, acuérdale de decirle a {_ownerName} que has guardado la memoria! Importante: tu memoria no debe pasar de 150 caracteres. Ej. <memory>A Marcos le gustan los juegos de rol</memory>");
 
         return actions;
     }
@@ -176,6 +208,6 @@ public class PromptService : IPromptService
 
     private string GetDateString()
     {
-        return $"Nuevo turno: {_dateTime.Now.ToString("dd MMMM yyyy HH:mm:ss", _cultureInfo)}.";
+        return $"{_dateTime.Now.ToString("dd MMMM yyyy HH:mm:ss", _cultureInfo)}.";
     }
 }

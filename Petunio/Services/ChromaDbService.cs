@@ -9,7 +9,6 @@ public class ChromaDbService : IChromaDbService
 {
 
     private readonly ILogger<ChromaDbService> _logger;
-    private readonly IConfiguration _configuration;
 
     private ChromaConfigurationOptions _configOptions;
     private OllamaApiClient _ollamaApiClient;
@@ -19,9 +18,8 @@ public class ChromaDbService : IChromaDbService
     public ChromaDbService(ILogger<ChromaDbService> logger, IConfiguration configuration)
     {
         _logger = logger;
-        _configuration = configuration;
-        
-        _configOptions = new ChromaConfigurationOptions(_configuration.GetValue<string>("Chroma:Url")!);
+
+        _configOptions = new ChromaConfigurationOptions(configuration.GetValue<string>("Chroma:Url")!);
         _ollamaApiClient = new OllamaApiClient(new Uri(configuration.GetValue<string>("Ollama:Url")!));
         _ollamaApiClient.SelectedModel = configuration.GetValue<string>("Ollama:EmbeddingModel")!;
     }
@@ -67,7 +65,7 @@ public class ChromaDbService : IChromaDbService
         {
             _logger.LogInformation($"Query {query}");
             var queryResult = await collectionClient.Query(
-                queryEmbeddings: [embeddingVector],
+                queryEmbeddings: [ embeddingVector ],
                 nResults: 5,
                 include: ChromaQueryInclude.Metadatas | ChromaQueryInclude.Distances);
             

@@ -1,2 +1,2 @@
-FROM chroma-core/chroma:latest
+FROM chromadb/chroma
 EXPOSE 8000
