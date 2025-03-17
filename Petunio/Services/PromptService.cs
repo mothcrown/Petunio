@@ -48,7 +48,7 @@ public class PromptService : IPromptService
             prompt += GetDiscordMessage() + Environment.NewLine;
         }
 
-        prompt += await GetMemoryString();
+        prompt += await GetMemoryString() + Environment.NewLine;
         prompt += LoadActionsString();
         return prompt;
     }
@@ -58,7 +58,7 @@ public class PromptService : IPromptService
         string memoryString = "";
         string query = GetMemoryQueryString();
         var memoryList = await _memoryService.GetMemoriesAsync(query);
-        if (memoryList.Any())
+        if (memoryList.Count > 0)
         {
             memoryString += "Tienes memorias relacionadas:" + Environment.NewLine;
             foreach (var memory in memoryList)
@@ -72,7 +72,14 @@ public class PromptService : IPromptService
 
     private string GetMemoryQueryString()
     {
-        return $"{GetDateString()} Mensaje de {_ownerName}: {_lastOwnerMessage}";
+        var memoryString = new StringBuilder();
+        memoryString.Append(GetDateString());
+        if (_ownerSentMessage)
+        {
+            memoryString.Append($" Mensaje de {_ownerName}: {_lastOwnerMessage}");
+        }
+        
+        return memoryString.ToString();
     }
 
     private string GetDiscordMessage()
@@ -170,7 +177,7 @@ public class PromptService : IPromptService
         // <message>
         if (IsOwnerAvailable())
         {
-            actions.Add("message", $"Mandar un mensaje a {_ownerName} o responder a un mensaje suyo. {_ownerName} no va a leer nada que no esté dentro de <message>. Ej. <message>Hola!</message>");
+            actions.Add("message", $"Mandar un mensaje a {_ownerName} o responder a un mensaje suyo. {_ownerName} no puede leer nada que no esté dentro de <message>. Ej. <message>Hola!</message>");
         }
         
         // <think>
@@ -208,6 +215,6 @@ public class PromptService : IPromptService
 
     private string GetDateString()
     {
-        return $"{_dateTime.Now.ToString("dd MMMM yyyy HH:mm:ss", _cultureInfo)}.";
+        return $"Es {_dateTime.Now.ToString("dd MMMM yyyy HH:mm:ss", _cultureInfo)}.";
     }
 }
