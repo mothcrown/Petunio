@@ -63,7 +63,7 @@ public class ChromaDbService : IChromaDbService
 
         try
         {
-            _logger.LogInformation($"Query {query}");
+            _logger.LogInformation($"New query to ChromaDB");
             var queryResult = await collectionClient.Query(
                 queryEmbeddings: [ embeddingVector ],
                 nResults: 5,
@@ -105,7 +105,7 @@ public class ChromaDbService : IChromaDbService
     {
         try
         {
-            _logger.LogInformation($"Fetching embedding data for '{data}'");
+            _logger.LogInformation($"Fetching embedding data for new query");
             var embeddingResponse = await _ollamaApiClient.EmbedAsync(data);
             return embeddingResponse.Embeddings[0].ToArray();
         }

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml;
 using Petunio.Interfaces;
 
@@ -32,7 +33,7 @@ public class PromptService : IPromptService
         _ownerSentMessage = false;
     }
 
-    public async Task<List<string?>> ProcessDiscordInputAsync(string input)
+    public async Task<string?> ProcessDiscordInputAsync(string input)
     {
         _ownerSentMessage = true;
         _lastOwnerMessage = input;
@@ -45,10 +46,10 @@ public class PromptService : IPromptService
         var prompt = GetDateString() + Environment.NewLine;
         if (_ownerSentMessage)
         {
-            prompt += GetDiscordMessage() + Environment.NewLine;
+            prompt += GetDiscordMessage();
         }
 
-        prompt += await GetMemoryString() + Environment.NewLine;
+        prompt += await GetMemoryString();
         prompt += LoadActionsString();
         return prompt;
     }
@@ -65,9 +66,11 @@ public class PromptService : IPromptService
             {
                 memoryString += $"* {memory}" + Environment.NewLine;
             }
+            
+            memoryString += Environment.NewLine;
         }
 
-        return memoryString;
+        return memoryString + Environment.NewLine;
     }
 
     private string GetMemoryQueryString()
@@ -95,46 +98,59 @@ public class PromptService : IPromptService
         throw new NotImplementedException();
     }
 
-    private async Task<List<string?>> ProcessAsync()
+    private async Task<string?> ProcessAsync()
     {
         var prompt = await BuildPrompt();
         _logger.LogDebug(prompt);
 
-        XmlDocument response = await GetPetunioResponse(prompt);
+        var response = await GetPetunioResponse(prompt);
         
-        var replies = new List<string?>();
-        
-        // First we resolve messages
-        var messageNodes = response.GetElementsByTagName("message");
-        if (messageNodes.Count > 0)
+        // Get memories
+        Match match = Regex.Match(response, @"<memory>(.*?)</memory>");
+        if (match.Success)
         {
-            foreach (XmlNode messageNode in messageNodes)
+            var groups = match.Groups;
+            var groupsLenght = groups.Count;
+            // Don't ask me why
+            for (int i = 0; i < groupsLenght; i++)
             {
-                replies.Add(messageNode.InnerText);
-            }
-            
-            _ownerSentMessage = false;
-        }
-        
-        var memoryNodes = response.GetElementsByTagName("memory");
-        if (memoryNodes.Count > 0)
-        {
-            foreach (XmlNode memoryNode in memoryNodes)
-            {
-                await _memoryService.SaveMemoryAsync(memoryNode.InnerText);    
+                if (i % 2 != 0)
+                {
+                    await _memoryService.SaveMemoryAsync(groups[i].Value);
+                }
             }
         }
+
+        response = FormatResponse(response);
         
-        return replies;
+        _ownerSentMessage = false;
+        return response;
     }
 
-    private async Task<XmlDocument> GetPetunioResponse(string prompt)
+    private string FormatResponse(string response)
     {
-        XmlDocument response = new XmlDocument();
+        // Remove <think> tags from response
+        // response = Regex.Replace(response, @"<memory>.*?</memory>", "");
+
+        // Remove <think> tags from response
+        // response = Regex.Replace(response, @"<think>.*?</think>", "");
+        
+        // .Replace ' with \'
+
+        var result = new StringBuilder();
+        var InCodeBlock = false;
+        
+
+        return response;
+    }
+
+    private async Task<string> GetPetunioResponse(string prompt)
+    {
+        string response;
+        
         try
         {
-            var strResponse = await _ollamaService.Message(prompt);
-            response = LoadXmlDocument(response, $"<response>{strResponse}</response>");
+            response = await _ollamaService.Message(prompt);
         }
         catch (Exception ex)
         {
@@ -145,46 +161,26 @@ public class PromptService : IPromptService
         return response;
     }
 
-    private XmlDocument LoadXmlDocument(XmlDocument response, string strResponse)
-    {
-        using StringWriter sw = new StringWriter();
-        using XmlTextWriter writer = new XmlTextWriter(sw);
-        writer.Formatting = Formatting.Indented;
-
-        response.LoadXml(strResponse);
-        response.WriteTo(writer);
-
-        return response;
-    }
-
     private string LoadActionsString()
     {
-        var actionsString = "Tus acciones disponibles:" + Environment.NewLine;
+        var actionsString = "Herramientas de asistente:" + Environment.NewLine;
         
         var actions = LoadActions();
         foreach (var action in actions)
         {
-            actionsString += $"<{action.Key}> - {action.Value}" + Environment.NewLine;
+            actionsString += action + Environment.NewLine;
         }
         
         return actionsString;
     }
 
-    private Dictionary<string, string> LoadActions()
+    private List<string> LoadActions()
     {
-        Dictionary<string, string> actions = new Dictionary<string, string>();
-        
-        // <message>
-        if (IsOwnerAvailable())
-        {
-            actions.Add("message", $"Mandar un mensaje a {_ownerName} o responder a un mensaje suyo. {_ownerName} no puede leer nada que no esté dentro de <message>. Ej. <message>Hola!</message>");
-        }
-        
+        List<string> actions = [];
         // <think>
-        actions.Add("think", $"Puedes pensar sobre algo que quieras o se te haya pedido. {_ownerName} no va a leer esto. Ej. <think>Uhmmm...</think>");
-        
+        actions.Add("Si necesitas pensar algo, usa la etiqueta think: por ejemplo <think>Estoy pensando!</think>");
         // <memory>
-        actions.Add("memory", $"Puedes guardar algo en tu memoria para recordarlo después, acuérdale de decirle a {_ownerName} que has guardado la memoria! Importante: tu memoria no debe pasar de 150 caracteres. Ej. <memory>A Marcos le gustan los juegos de rol</memory>");
+        actions.Add("Si necesitas guardar algo en tu memoria, usa la etiqueta memory: por ejemplo <memory>A Marcos le gustan los juegos de rol</memory>");
 
         return actions;
     }

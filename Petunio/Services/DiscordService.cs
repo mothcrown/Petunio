@@ -1,4 +1,6 @@
+using System.Reflection;
 using Discord;
+using Discord.Commands;
 using Discord.WebSocket;
 using Petunio.Interfaces;
 
@@ -10,23 +12,29 @@ public class DiscordService : IDiscordService
     private readonly IConfiguration _configuration;
     private readonly IPromptService _promptService;
     private readonly DiscordSocketClient _client;
+    private readonly CommandService _commands;
+    private IServiceProvider? _serviceProvider;
     private readonly ulong _discordUserId;
     
-    public DiscordService(ILogger<DiscordService> logger, IConfiguration configuration, IPromptService promptService)
+    public DiscordService(ILogger<DiscordService> logger, IConfiguration configuration, IPromptService promptService, IServiceProvider serviceProvider)
     {
         _logger = logger;
         _configuration = configuration;
         _promptService = promptService;
         _discordUserId = _configuration.GetValue<ulong>("Discord:UserId");
+        _serviceProvider = serviceProvider;
 
         DiscordSocketConfig config = new();
         _client = new DiscordSocketClient(config);
+        _commands = new CommandService();
     }
 
     public async Task StartAsync()
     {
         var discordToken = _configuration.GetValue<string>("Discord:Token") 
                            ?? throw new Exception("Missing Discord token");
+        
+        await _commands.AddModulesAsync(Assembly.GetExecutingAssembly(), _serviceProvider);
 
         await _client.LoginAsync(TokenType.Bot, discordToken);
         await _client.StartAsync();
@@ -42,17 +50,29 @@ public class DiscordService : IDiscordService
 
     public async Task MessageReceivedAsync(SocketMessage message)
     {
-        _logger.LogInformation("Discord message received");
         if (!IsValidMessage(message)) return;
+        _logger.LogInformation($"Discord message from {message.Author.Username}#{message.Author.Id} received");
+        
+        var userCommand = (SocketUserMessage)message;
+        int position = 0;
+        bool messageIsCommand = userCommand.HasCharPrefix('!', ref position);
 
-        using (message.Channel.EnterTypingState());
-        var responses = await _promptService.ProcessDiscordInputAsync(message.Content);
-
-        foreach (var response in responses)
+        using (message.Channel.EnterTypingState())
         {
-            if (!string.IsNullOrEmpty(response))
+            if (messageIsCommand)
             {
-                await message.Channel.SendMessageAsync(response);
+                await _commands.ExecuteAsync(
+                    new SocketCommandContext(_client, userCommand),
+                    position,
+                    _serviceProvider);
+            }
+            else
+            {
+                var response = await _promptService.ProcessDiscordInputAsync(message.Content);
+                if (!string.IsNullOrEmpty(response))
+                {
+                    await message.Channel.SendMessageAsync(response);
+                }
             }
         }
     }
