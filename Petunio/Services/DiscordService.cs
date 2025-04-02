@@ -69,9 +69,20 @@ public class DiscordService : IDiscordService
             else
             {
                 var response = await _promptService.ProcessDiscordInputAsync(message.Content);
-                if (!string.IsNullOrEmpty(response))
+                if (response is not null)
                 {
-                    await message.Channel.SendMessageAsync(response);
+                    if (!string.IsNullOrEmpty(response.Response))
+                    {
+                        await message.Channel.SendMessageAsync(response.Response);
+                    }
+                    
+                    if (response.Images!.Count > 0)
+                    {
+                        foreach (var image in response.Images!)
+                        {
+                            await message.Channel.SendFileAsync(image);
+                        }
+                    }
                 }
             }
         }

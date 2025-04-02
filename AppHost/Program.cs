@@ -16,8 +16,15 @@ var chroma = builder
     .WithHttpEndpoint(env: "CHROMA_HTTP_ENDPOINT", port: 8000, targetPort: 8000)
     .WaitFor(ollama);
 
-
 // Petunio
-builder.AddProject<Petunio>("petunio").WaitFor(chroma);
+var petunio = builder.AddProject<Petunio>("petunio").WaitFor(chroma);
+
+// ComfyUI
+var comfyUI = builder
+    .AddDockerfile("comfyUI", "ComfyUI", "Dockerfile")
+    .WithVolume("comfyUI", "/env")
+    .WithHttpEndpoint(env: "COMFYUI_HTTP_ENDPOINT", port: 8188, targetPort: 8188, isProxied: false)
+    .WithContainerRuntimeArgs("--gpus=all")
+    .WaitFor(petunio);
 
 builder.Build().Run();

@@ -11,6 +11,7 @@ public class RoutesCommand(ILogger<RoutesCommand> logger, IWalkChallengeService 
     [Summary("Gets list of routes")]
     public async Task ExecuteAsync()
     {
+        logger.LogInformation($"Returning list of routes for user {Context.User.Id}");
         var routes = String.Join("\\n", walkChallengeService.GetRoutes());
         var reply = new EmbedBuilder() { Title = "Available routes", Color = Color.DarkGreen, Description = routes };
         await ReplyAsync("", false, reply.Build());

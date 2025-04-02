@@ -14,6 +14,7 @@ public class ChromaDbService : IChromaDbService
     private OllamaApiClient _ollamaApiClient;
     
     private const string MEMORY_COLLECTION_NAME = "memories";
+    private const int MAX_MEMORIES = 5;
 
     public ChromaDbService(ILogger<ChromaDbService> logger, IConfiguration configuration)
     {
@@ -31,10 +32,10 @@ public class ChromaDbService : IChromaDbService
         await client.GetOrCreateCollection(MEMORY_COLLECTION_NAME);
     }
 
-    public async Task<string> AddToCollectionAsync(string data)
+    public async Task<string> AddToCollectionAsync(string collection, string data)
     {
         using var httpClient = new HttpClient();
-        var collectionClient = await GetCollectionClient(httpClient);
+        var collectionClient = await GetCollectionClient(httpClient, collection);
         var embeddingVector = await GetStringEmbedding(data);
 
         try
@@ -55,10 +56,10 @@ public class ChromaDbService : IChromaDbService
         }
     }
 
-    public async Task<List<string>> QueryCollectionAsync(string query)
+    public async Task<List<string>> QueryCollectionAsync(string collection, string query)
     {
         using var httpClient = new HttpClient();
-        var collectionClient = await GetCollectionClient(httpClient);
+        var collectionClient = await GetCollectionClient(httpClient, collection);
         var embeddingVector = await GetStringEmbedding(query);
 
         try
@@ -66,7 +67,7 @@ public class ChromaDbService : IChromaDbService
             _logger.LogInformation($"New query to ChromaDB");
             var queryResult = await collectionClient.Query(
                 queryEmbeddings: [ embeddingVector ],
-                nResults: 5,
+                nResults: MAX_MEMORIES,
                 include: ChromaQueryInclude.Metadatas | ChromaQueryInclude.Distances);
             
             return GetCollectionQueryEntryResultList(queryResult);
@@ -76,6 +77,34 @@ public class ChromaDbService : IChromaDbService
             _logger.LogError(e, e.Message);
             throw;
         }
+    }
+
+    public async Task DeleteFromCollectionAsync(string collection, string id)
+    {
+        using var httpClient = new HttpClient();
+        var collectionClient = await GetCollectionClient(httpClient, collection);
+        await collectionClient.Delete(new List<string>() { id });
+    }
+
+    public async Task<List<string>> GetCollectionAsync(string collection)
+    {
+        using var httpClient = new HttpClient();
+        var collectionClient = await GetCollectionClient(httpClient, collection);
+        var result = await collectionClient.Get();
+        return GetCollectionEntryResultList(result);
+    }
+    
+    private List<string> GetCollectionEntryResultList(List<ChromaCollectionEntry> collectionResult)
+    {
+        var list = new List<string>();
+
+        foreach (var result in collectionResult)
+        {
+            var entry = $"{result.Id} - {result.Metadata?["Memory"]!}";
+            list.Add(entry);
+        }
+
+        return list;
     }
 
     private List<string> GetCollectionQueryEntryResultList(List<List<ChromaCollectionQueryEntry>> queryResult)
@@ -94,10 +123,10 @@ public class ChromaDbService : IChromaDbService
         return list;
     }
 
-    private async Task<ChromaCollectionClient> GetCollectionClient(HttpClient httpClient)
+    private async Task<ChromaCollectionClient> GetCollectionClient(HttpClient httpClient, string collectionName)
     {
         var client = new ChromaClient(_configOptions, httpClient);
-        var collection = await client.GetOrCreateCollection(MEMORY_COLLECTION_NAME);
+        var collection = await client.GetOrCreateCollection(collectionName);
         return new ChromaCollectionClient(collection, _configOptions, httpClient);
     }
     
@@ -105,7 +134,7 @@ public class ChromaDbService : IChromaDbService
     {
         try
         {
-            _logger.LogInformation($"Fetching embedding data for new query");
+            _logger.LogInformation("Fetching embedding data for new query");
             var embeddingResponse = await _ollamaApiClient.EmbedAsync(data);
             return embeddingResponse.Embeddings[0].ToArray();
         }

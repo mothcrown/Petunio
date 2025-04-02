@@ -12,6 +12,7 @@ public class RouteCommand(ILogger<RouteCommand> logger, IWalkChallengeService wa
     {
         if (!walkChallengeService.RouteExists(route)) await ReplyAsync($"Route '{route}' does not exist");
         walkChallengeService.SetRouteActive(Context.User.Id.ToString(), route);
+        logger.LogInformation($"Route '{route}' is active for user {Context.User.Id}");
         await ReplyAsync($"Route '{route}' is now active!");
     }
 }

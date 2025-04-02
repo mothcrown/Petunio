@@ -486,3 +486,8 @@ $RECYCLE.BIN/
 # WalkChallengeRoutes
 WalkChallengeRoutes/
 WalkChallengeTrackers/
+
+# ComfyUI
+AppHost/ComfyUI/
+petunio_prompt.json
+GeneratedImages/

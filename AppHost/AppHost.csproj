@@ -20,4 +20,9 @@
       <ProjectReference Include="..\Petunio\Petunio.csproj" />
     </ItemGroup>
 
+    <Target Name="PreBuild" BeforeTargets="Build">
+        <Exec Command=".\Scripts\pre-build.bat" Condition="'$(OS)' == 'Windows_NT'" />
+        <Exec Command="sh ./Scripts/pre-build.sh" Condition="'$(OS)' != 'Windows_NT'" />
+    </Target>
+
 </Project>

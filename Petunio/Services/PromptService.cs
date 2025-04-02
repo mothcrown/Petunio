@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 using Petunio.Interfaces;
+using Petunio.Models;
 
 namespace Petunio.Services;
 
@@ -13,6 +14,7 @@ public class PromptService : IPromptService
     private readonly IConfiguration _configuration;
     private readonly IOllamaService _ollamaService;
     private readonly IMemoryService _memoryService;
+    private readonly IImageGenerationService _imageGenerationService;
     
     private readonly CultureInfo _cultureInfo;
     private readonly string _ownerName;
@@ -20,20 +22,21 @@ public class PromptService : IPromptService
     private string? _lastOwnerMessage;
     
     public PromptService(ILogger<PromptService> logger, IDateTime dateTime, IConfiguration configuration,
-        IOllamaService ollamaService, IMemoryService memoryService)
+        IOllamaService ollamaService, IMemoryService memoryService, IImageGenerationService imageGenerationService)
     {
         _logger = logger;
         _dateTime = dateTime;
         _configuration = configuration;
         _ollamaService = ollamaService;
         _memoryService = memoryService;
+        _imageGenerationService = imageGenerationService;
         
         _ownerName = _configuration.GetValue<string>("OwnerName")!;
         _cultureInfo = new CultureInfo("es-ES");
         _ownerSentMessage = false;
     }
 
-    public async Task<string?> ProcessDiscordInputAsync(string input)
+    public async Task<PetunioResponse?> ProcessDiscordInputAsync(string input)
     {
         _ownerSentMessage = true;
         _lastOwnerMessage = input;
@@ -98,15 +101,51 @@ public class PromptService : IPromptService
         throw new NotImplementedException();
     }
 
-    private async Task<string?> ProcessAsync()
+    private async Task<PetunioResponse?> ProcessAsync()
     {
         var prompt = await BuildPrompt();
         _logger.LogDebug(prompt);
 
         var response = await GetPetunioResponse(prompt);
+        await ProcessMemoryTags(response);
+        List<string> imagePaths = await ProcessImageTags(response);
         
-        // Get memories
-        Match match = Regex.Match(response, @"<memory>(.*?)</memory>");
+        var petunioResponse = new PetunioResponse();
+        petunioResponse.Response = FormatResponse(response);
+        petunioResponse.Images = imagePaths;
+        
+        _ownerSentMessage = false;
+        return petunioResponse;
+    }
+
+    private async Task<List<string>> ProcessImageTags(string response)
+    {
+        List<string> imagePaths = new List<string>();
+        
+        var imageDescriptions = ProcessTags(response, "image");
+        foreach (var description in imageDescriptions)
+        {
+            var imagePath = await _imageGenerationService.GenerateImageAsync(description);
+            if (imagePath != null) imagePaths.Add(imagePath);
+        }
+        
+        return imagePaths;
+    }
+
+    private async Task ProcessMemoryTags(string response)
+    {
+        var memories = ProcessTags(response, "memory");
+        foreach (var memory in memories)
+        {
+            await _memoryService.SaveMemoryAsync(memory);
+        }
+    }
+    
+    private List<string> ProcessTags(string response, string tag)
+    {
+        List<string> values = new List<string>();
+        
+        Match match = Regex.Match(response, $"<{tag}>(.*?)</{tag}>");
         if (match.Success)
         {
             var groups = match.Groups;
@@ -116,15 +155,12 @@ public class PromptService : IPromptService
             {
                 if (i % 2 != 0)
                 {
-                    await _memoryService.SaveMemoryAsync(groups[i].Value);
+                    values.Add(groups[i].Value);
                 }
             }
         }
 
-        response = FormatResponse(response);
-        
-        _ownerSentMessage = false;
-        return response;
+        return values;
     }
 
     private string FormatResponse(string response)
@@ -134,14 +170,21 @@ public class PromptService : IPromptService
 
         // Remove <think> tags from response
         // response = Regex.Replace(response, @"<think>.*?</think>", "");
-        
-        // .Replace ' with \'
 
-        var result = new StringBuilder();
-        var InCodeBlock = false;
-        
-
-        return response;
+        return ToLowerCase(response);
+    }
+    
+    private static string ToLowerCase(string response)
+    {
+        return Regex.Replace(response, "(```.*?```)|([^`]+)", match =>
+        {
+            if (match.Groups[1].Success)
+            {
+                return match.Groups[1].Value;
+            }
+            
+            return match.Groups[2].Value.ToLower();
+        }, RegexOptions.Singleline);
     }
 
     private async Task<string> GetPetunioResponse(string prompt)
@@ -178,9 +221,11 @@ public class PromptService : IPromptService
     {
         List<string> actions = [];
         // <think>
-        actions.Add("Si necesitas pensar algo, usa la etiqueta think: por ejemplo <think>Estoy pensando!</think>");
+        actions.Add("Si quieres pensar algo, usa la etiqueta think: por ejemplo <think>Estoy pensando!</think>");
         // <memory>
-        actions.Add("Si necesitas guardar algo en tu memoria, usa la etiqueta memory: por ejemplo <memory>A Marcos le gustan los juegos de rol</memory>");
+        actions.Add("Si quieres guardar algo en tu memoria, usa la etiqueta memory: por ejemplo <memory>A Marcos le gustan los juegos de rol</memory>");
+        // <image>
+        actions.Add("Si quieres generar una imagen, usa la etiqueta image: por ejemplo <image>a samurai white cat</image>");
 
         return actions;
     }

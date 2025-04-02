@@ -6,7 +6,6 @@ namespace Petunio.Services;
 
 public class WalkChallengeService(ILogger<WalkChallengeService> logger) : IWalkChallengeService
 {
-    
     private const string ROUTE_DIR = "WalkChallengeRoutes";
     private const string TRACKERS_DIR = "WalkChallengeTrackers";
     
@@ -23,7 +22,6 @@ public class WalkChallengeService(ILogger<WalkChallengeService> logger) : IWalkC
         string description = GetMilepostDescription(activeTracker);
 
         return description;
-
     }
 
     private string GetMilepostDescription(WalkChallengeTracker activeTracker)
@@ -31,8 +29,6 @@ public class WalkChallengeService(ILogger<WalkChallengeService> logger) : IWalkC
         var mileposts = GetRouteMileposts(activeTracker.Route);
         var currentMilepost = GetCurrentMilepost(activeTracker, mileposts);
         return currentMilepost.Description;
-        
-        
     }
 
     private WalkChallengeMilepost GetCurrentMilepost(WalkChallengeTracker activeTracker, List<WalkChallengeMilepost> mileposts)
@@ -83,7 +79,11 @@ public class WalkChallengeService(ILogger<WalkChallengeService> logger) : IWalkC
     public bool SetRouteActive(string discordUserId, string route)
     {
         var filePath = Path.Combine(TRACKERS_DIR, $"{discordUserId}.json");
-        if (!File.Exists(filePath)) CreateWalkChallengeUser(route, filePath);
+        if (!File.Exists(filePath))
+        {
+            logger.LogInformation($"Creating new walk challenge user: {discordUserId}");
+            CreateWalkChallengeUser(route, filePath);
+        }
         
         var tracks = JsonHelper.ReadJson<List<WalkChallengeTracker>>(filePath);
         foreach (var walkChallengeTrack in tracks)
@@ -108,7 +108,7 @@ public class WalkChallengeService(ILogger<WalkChallengeService> logger) : IWalkC
         return routes.Any(r => r == route);
     }
 
-    private static void CreateWalkChallengeUser(string route, string filePath)
+    private void CreateWalkChallengeUser(string route, string filePath)
     {
         File.Create(filePath).Dispose();
         List<WalkChallengeTracker> tracks = [new () { Route = route, Active = true, KilometersWalked = 0 }];
